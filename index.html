@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>お買い物リスト</title>
+  <title>やることリスト</title>
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%233D7A78'/%3E%3Ctext x='90' y='82' font-family='sans-serif' font-size='36' font-weight='bold' fill='white' text-anchor='middle'%3E%E8%B2%B7%E3%81%84%E7%89%A9%3C/text%3E%3Ctext x='90' y='130' font-family='sans-serif' font-size='36' font-weight='bold' fill='white' text-anchor='middle'%3E%E3%83%AA%E3%82%B9%E3%83%88%3C/text%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
@@ -28,6 +28,7 @@
       padding-bottom:48px;
     }
 
+```
 /* ========== HEADER ========== */
 .header {
   background:#3D7A78;
@@ -270,7 +271,7 @@
 .empty-global { text-align:center; padding:48px 20px; color:#CCC; font-size:14px; }
 .empty-global .e-emoji { font-size:48px; margin-bottom:12px; }
 
-/* SECTION DIVIDER (買うもの一覧) */
+/* SECTION DIVIDER (一覧) */
 .list-divider {
   font-size:11px; font-weight:700; letter-spacing:1px;
   color:#BBB; padding:4px 2px 8px; text-transform:uppercase;
@@ -327,7 +328,7 @@
 <div class="header">
   <!-- タイトル＋統計 -->
   <div class="header-title-row">
-    <div class="header-title">お買い物リスト<span>shopping list</span></div>
+    <div class="header-title">やることリスト<span>todo list</span></div>
     <div class="stats-mini">
       <div class="stat-item">
         <div class="stat-num" id="statLeft">0</div>
@@ -336,7 +337,7 @@
       <div class="stat-sep"></div>
       <div class="stat-item">
         <div class="stat-num" id="statDone">0</div>
-        <div class="stat-lbl">完了</div>
+        <div class="stat-lbl">購入・対応済み</div>
       </div>
       <div class="stat-sep"></div>
       <div class="stat-item">
@@ -367,8 +368,9 @@
   <!-- ビュー切替 -->
 
   <div class="view-tabs" id="viewTabs">
-    <button class="view-tab active" data-view="all"      onclick="switchView('all')">全体</button>
-    <button class="view-tab"        data-view="shoplist" onclick="switchView('shoplist')">買うもの一覧</button>
+    <button class="view-tab active" data-view="all"       onclick="switchView('all')">全体</button>
+    <button class="view-tab"        data-view="shoplist"  onclick="switchView('shoplist')">一覧</button>
+    <button class="view-tab"        data-view="purchased" onclick="switchView('purchased')">購入・対応済み</button>
   </div>
 
   <!-- ジャンプナビ -->
@@ -382,15 +384,25 @@
 const PURPOSES = [
   { id:'dinner', label:'🥕 食材',           cls:'pt-dinner', ibcls:'ib-dinner' },
   { id:'daily',  label:'🧴 日用品・消耗品', cls:'pt-daily',  ibcls:'ib-daily'  },
-  { id:'nana',   label:'🍼 離乳食',         cls:'pt-nana',   ibcls:'ib-nana'   },
+  { id:'nana',   label:'📝 タスク',         cls:'pt-nana',   ibcls:'ib-nana'   },
 ];
 const STORE_EMOJIS = ['🛒','🏬','🏪','🛍️','🏷️','📦'];
 
 function load() {
-  return JSON.parse(localStorage.getItem('shopData_v6') || 'null') || {
-    stores: [{ id:'s1', name:'西友' }, { id:'s2', name:'アトレ' }],
+  const d = JSON.parse(localStorage.getItem('shopData_v6') || 'null') || {
+    stores: [{ id:'s1', name:'西友' }, { id:'s2', name:'アトレ' }, { id:'task-store', name:'タスク' }],
     items:  [],
+    purchased: [],
   };
+  if (!d.purchased) d.purchased = [];
+  // task-storeを持つ食材・日用品アイテムを削除（誤混入データのクリーンアップ）
+  d.items = d.items.filter(i => !(i.storeId === 'task-store' && i.purposeId !== 'nana'));
+  // task-storeがstoresに入っていたら除去（storesリストには不要）
+  d.stores = d.stores.filter(s => s.id !== 'task-store');
+  // 24時間以上経過した購入・対応済みアイテムを自動削除
+  const now = Date.now();
+  d.purchased = d.purchased.filter(i => now - i.purchasedAt < 24 * 60 * 60 * 1000);
+  return d;
 }
 function save(d) { localStorage.setItem('shopData_v6', JSON.stringify(d)); }
 
@@ -408,7 +420,7 @@ function rebuildSelects() {
   sp.innerHTML = '<option value="all">すべて</option>' +
     PURPOSES.map(p=>`<option value="${p.id}">${p.label}</option>`).join('');
   ss.innerHTML = '<option value="all">すべて</option>' +
-    data.stores.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    data.stores.filter(s=>s.id!=='task-store').map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
 
   sp.value = pv; ss.value = sv;
   filterPurpose = sp.value;
@@ -427,6 +439,8 @@ function switchView(v) {
   document.querySelectorAll('.view-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.view === v);
   });
+  // ジャンプナビはpurchasedビューでは非表示
+  document.getElementById('jumpNav').style.display = v === 'purchased' ? 'none' : '';
   render();
 }
 
@@ -454,12 +468,11 @@ function buildJumpNav() {
 /* ========== STATS ========== */
 function renderStats() {
   const total = data.items.length;
-  const done  = data.items.filter(i=>i.done).length;
-  const left  = total - done;
-  const pct   = total ? Math.round(done/total*100) : 0;
+  const purchased = data.purchased.length;
   document.getElementById('statTotal').textContent = total;
-  document.getElementById('statLeft').textContent  = left;
-  document.getElementById('statDone').textContent  = done;
+  document.getElementById('statLeft').textContent  = total;
+  document.getElementById('statDone').textContent  = purchased;
+  const pct = (total + purchased) ? Math.round(purchased / (total + purchased) * 100) : 0;
   document.getElementById('progressBar').style.width = pct+'%';
 }
 
@@ -469,6 +482,7 @@ function render() {
   buildJumpNav();
   renderStats();
   if (currentView === 'shoplist') renderShopList();
+  else if (currentView === 'purchased') renderPurchased();
   else renderAllView();
 }
 
@@ -476,23 +490,49 @@ function render() {
 function renderAllView() {
   let html = '';
   const showPurposes = PURPOSES.filter(p => filterPurpose==='all' || p.id===filterPurpose);
-  const showStores   = data.stores.filter(s => filterStore==='all' || s.id===filterStore);
+  const showStores   = data.stores.filter(s => (filterStore==='all' || s.id===filterStore) && s.id!=='task-store');
 
   showPurposes.forEach(p => {
     html += `<div class="purpose-section" id="sec-${p.id}">
       <div class="purpose-title ${p.cls}">${p.label}</div>`;
 
+    // タスクカテゴリは店なしで直接表示
+    if (p.id === 'nana') {
+      const tItems = data.items.filter(i => i.purposeId === 'nana' && i.storeId === 'task-store');
+      html += `<div class="store-section">
+        <div class="item-list" id="list-nana-task-store">`;
+      if (!tItems.length) {
+        html += `<div class="empty-store">タスクを追加してください</div>`;
+      } else {
+        tItems.forEach(item => { html += itemHTML(item, false); });
+      }
+      html += `</div>
+        <div class="add-row">
+          <input class="add-input" id="inp-nana-task-store"
+            placeholder="タスクを入力…"
+            onkeydown="if(event.key==='Enter')addItem('nana','task-store')">
+          <button class="mic-btn" id="mic-nana-task-store"
+            ontouchstart="startVoice(event,'nana','task-store')"
+            ontouchend="stopVoice(event)"
+            onmousedown="startVoice(event,'nana','task-store')"
+            onmouseup="stopVoice(event)">🎤</button>
+          <button class="add-btn-small" onclick="addItem('nana','task-store')">＋</button>
+        </div>
+      </div>`;
+      html += `</div>`;
+      return;
+    }
+
     showStores.forEach((store) => {
       const ci    = data.stores.indexOf(store) % 6;
       const emoji = STORE_EMOJIS[data.stores.indexOf(store) % STORE_EMOJIS.length];
       const sItems = data.items.filter(i=>i.purposeId===p.id && i.storeId===store.id);
-      const dnCnt  = sItems.filter(i=>i.done).length;
 
       html += `<div class="store-section" id="sec-store-${store.id}">
         <div class="store-header sc${ci}">
           <div class="store-name-wrap">
             <span class="store-name sn${ci}">${emoji} ${esc(store.name)}</span>
-            <span class="store-count" id="cnt-${p.id}-${store.id}">${dnCnt}/${sItems.length}</span>
+            <span class="store-count" id="cnt-${p.id}-${store.id}">${sItems.length}</span>
           </div>
           <button class="store-del-btn" onclick="deleteStore('${store.id}')">✕</button>
         </div>
@@ -501,7 +541,7 @@ function renderAllView() {
       if (!sItems.length) {
         html += `<div class="empty-store">商品を追加してください</div>`;
       } else {
-        [...sItems.filter(i=>!i.done), ...sItems.filter(i=>i.done)].forEach(item => {
+        sItems.forEach(item => {
           html += itemHTML(item, false);
         });
       }
@@ -542,7 +582,7 @@ function renderAllView() {
   document.getElementById('mainContent').innerHTML = html;
 }
 
-/* --- 買うもの一覧ビュー --- */
+/* --- 一覧ビュー --- */
 function renderShopList() {
   const allItems = data.items.filter(i => {
     if (filterPurpose !== 'all' && i.purposeId !== filterPurpose) return false;
@@ -550,34 +590,58 @@ function renderShopList() {
     return true;
   });
 
-  const undone = allItems.filter(i=>!i.done);
-  const done   = allItems.filter(i=>i.done);
-
   if (!allItems.length) {
     document.getElementById('mainContent').innerHTML =
       `<div class="empty-global"><div class="e-emoji">🎉</div>買うものはありません！</div>`;
     return;
   }
 
-  let html = '';
-  if (undone.length) {
-    html += `<div class="list-divider">🛒 未購入 (${undone.length}件)</div>`;
-    html += `<div class="store-section"><div class="item-list">`;
-    groupByStore(undone).forEach(({ store, items }) => {
-      const em = STORE_EMOJIS[data.stores.indexOf(store) % STORE_EMOJIS.length];
-      html += `<div style="padding:6px 0 2px; font-size:11px; font-weight:900; color:var(--blue); border-bottom:1px solid #F0F0F0; margin-bottom:2px;">${em} ${esc(store.name)}</div>`;
-      items.forEach(item => { html += itemHTML(item, true); });
-    });
-    html += `</div></div>`;
-  }
-  if (done.length) {
-    html += `<div class="list-divider" style="margin-top:16px;">✓ 購入済み (${done.length}件)</div>`;
-    html += `<div class="store-section"><div class="item-list">`;
-    done.forEach(item => { html += itemHTML(item, true); });
-    html += `</div></div>`;
-  }
+  let html = `<div class="list-divider">🛒 未購入 (${allItems.length}件)</div>`;
+  html += `<div class="store-section"><div class="item-list">`;
+  groupByStore(allItems).forEach(({ store, items }) => {
+    const em = STORE_EMOJIS[data.stores.indexOf(store) % STORE_EMOJIS.length];
+    html += `<div style="padding:6px 0 2px; font-size:11px; font-weight:900; color:var(--teal); border-bottom:1px solid #F0F0F0; margin-bottom:2px;">${em} ${esc(store.name)}</div>`;
+    items.forEach(item => { html += itemHTML(item, true); });
+  });
+  html += `</div></div>`;
 
   document.getElementById('mainContent').innerHTML = html;
+}
+
+/* --- 購入・対応済みビュー --- */
+function renderPurchased() {
+  const items = [...data.purchased].reverse(); // 新しい順
+  if (!items.length) {
+    document.getElementById('mainContent').innerHTML =
+      `<div class="empty-global"><div class="e-emoji">🛍️</div>購入・対応済みアイテムはありません<br><span style="font-size:11px;color:#CCC">購入から24時間後に自動削除されます</span></div>`;
+    return;
+  }
+
+  let html = `<div style="text-align:right;font-size:11px;color:#BBB;padding:0 4px 8px;">購入から24時間後に自動削除</div>`;
+  html += `<div class="store-section"><div class="item-list">`;
+  items.forEach(item => {
+    const p = PURPOSES.find(p=>p.id===item.purposeId);
+    const store = data.stores.find(s=>s.id===item.storeId);
+    const remaining = Math.max(0, Math.ceil((24*60*60*1000 - (Date.now() - item.purchasedAt)) / (60*60*1000)));
+    html += `<div class="item done" id="item-${item.id}" data-id="${item.id}" style="opacity:0.75">
+      <div class="item-check" style="background:var(--green);border-color:var(--green);color:white;font-size:11px;">✓</div>
+      <div style="flex:1;min-width:0;">
+        <div class="item-name" style="text-decoration:line-through;color:#BBB;font-weight:400;">${esc(item.name)}</div>
+        <div style="font-size:10px;color:#CCC;">${store ? esc(store.name) : ''} · ${item.purchasedAtStr} · あと${remaining}時間</div>
+      </div>
+      ${p ? `<span class="item-badge ${p.ibcls}">${p.label.replace(/^../,'')}</span>` : ''}
+      <button class="item-del" onclick="deletePurchased('${item.id}')">🗑</button>
+    </div>`;
+  });
+  html += `</div></div>`;
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function deletePurchased(itemId) {
+  data.purchased = data.purchased.filter(i=>i.id!==itemId);
+  save(data);
+  renderStats();
+  renderPurchased();
 }
 
 function groupByStore(items) {
@@ -600,48 +664,12 @@ function itemHTML(item, showBadge) {
 
 /* ========== DOM PATCH — スクロールしない更新 ========== */
 
-// アイテム1件のDOMを直接書き換え（チェック時）
-function patchItem(item) {
-  const el = document.getElementById('item-'+item.id);
-  if (!el) { render(); return; }
-  el.className = 'item'+(item.done?' done':'');
-  el.querySelector('.item-check').textContent = item.done ? '✓' : '';
-  el.querySelector('.item-check').style.background = item.done ? 'var(--green)' : 'white';
-  el.querySelector('.item-check').style.borderColor = item.done ? 'var(--green)' : '#DDD';
-  el.querySelector('.item-check').style.color = item.done ? 'white' : '';
-  el.querySelector('.item-name').style.textDecoration = item.done ? 'line-through' : '';
-  el.querySelector('.item-name').style.color = item.done ? '#CCC' : '';
-  el.querySelector('.item-name').style.fontWeight = item.done ? '400' : '700';
-  // 日時表示を更新
-  let metaEl = el.querySelector('.item-meta');
-  if (item.done && item.doneAt) {
-    if (!metaEl) {
-      metaEl = document.createElement('div');
-      metaEl.className = 'item-meta';
-      el.querySelector('.item-del').before(metaEl);
-    }
-    metaEl.textContent = item.doneAt;
-  } else if (metaEl) {
-    metaEl.remove();
-  }
-  // カウンター更新
-  patchCounts(item.purposeId, item.storeId);
-  renderStats();
-
-  // 買うもの一覧ビューではチェック時に並び順が変わるので再描画
-  if (currentView === 'shoplist') {
-    const sy = window.scrollY;
-    renderShopList();
-    requestAnimationFrame(()=>window.scrollTo(0, sy));
-  }
-}
-
-// カウンター (x/y) だけ更新
+// カウンター だけ更新
 function patchCounts(purposeId, storeId) {
   const el = document.getElementById('cnt-'+purposeId+'-'+storeId);
   if (!el) return;
   const sItems = data.items.filter(i=>i.purposeId===purposeId && i.storeId===storeId);
-  el.textContent = sItems.filter(i=>i.done).length+'/'+sItems.length;
+  el.textContent = sItems.length;
 }
 
 // アイテム追加：該当リストにだけ要素を追加
@@ -698,7 +726,7 @@ function addItem(purposeId, storeId) {
   const input = document.getElementById(key);
   const name  = input ? input.value.trim() : '';
   if (!name) { if(input) input.focus(); return; }
-  const item = { id:'i'+Date.now()+Math.random(), purposeId, storeId, name, done:false, doneAt:null };
+  const item = { id:'i'+Date.now()+Math.random(), purposeId, storeId, name };
   data.items.push(item);
   input.value = '';
   save(data);
@@ -709,12 +737,27 @@ function addItem(purposeId, storeId) {
 function toggleItem(itemId) {
   const item = data.items.find(i=>i.id===itemId);
   if (!item) return;
-  item.done = !item.done;
-  item.doneAt = item.done
-    ? (()=>{ const n=new Date(); return `${n.getMonth()+1}/${n.getDate()} ${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}`; })()
-    : null;
+  // 全体から削除して購入・対応済みへ移動
+  data.items = data.items.filter(i=>i.id!==itemId);
+  const purchasedItem = {
+    ...item,
+    purchasedAt: Date.now(),
+    purchasedAtStr: (()=>{ const n=new Date(); return `${n.getMonth()+1}/${n.getDate()} ${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}`; })()
+  };
+  data.purchased.push(purchasedItem);
   save(data);
-  patchItem(item);
+  // 全体ビューなら削除アニメーション
+  const el = document.getElementById('item-'+itemId);
+  if (el) {
+    el.style.transition = 'opacity 0.3s, transform 0.3s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(20px)';
+    setTimeout(() => {
+      const { purposeId, storeId } = item;
+      patchDeleteItem(itemId, purposeId, storeId);
+    }, 280);
+  }
+  renderStats();
 }
 
 function deleteItem(itemId) {
