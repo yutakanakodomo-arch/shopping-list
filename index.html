@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛒 お買い物リスト</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal:      #3D7A78;
+      --teal-lt:   #5A9E9C;
+      --teal-pale: #EAF4F4;
+      --warm1:     #E8833A;  /* オレンジ */
+      --warm2:     #D4A843;  /* ゴールド */
+      --warm3:     #C06B3D;  /* テラコッタ */
+      --green:     #5A9E7A;  /* チェック済み */
+      --bg:        #F7F5F2;
+      --dark:      #2D2D2D;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      font-family:'Noto Sans JP',sans-serif;
+      background:var(--bg);
+      min-height:100vh;
+      padding-bottom:48px;
+    }
+
+```
+/* ========== HEADER ========== */
+.header {
+  background:#3D7A78;
+  border-bottom:none;
+  position:sticky; top:0; z-index:100;
+  padding:0 18px;
+}
+
+/* タイトル行 */
+.header-title-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 0 10px;
+  border-bottom:1px solid rgba(255,255,255,0.15);
+}
+.header-title {
+  font-family:'Noto Sans JP',sans-serif;
+  font-size:16px; font-weight:700; letter-spacing:0.08em;
+  color:white;
+}
+.header-title span {
+  font-size:10px; letter-spacing:0.14em;
+  color:rgba(255,255,255,0.6); font-weight:300; margin-left:8px;
+  vertical-align:middle;
+}
+
+/* 統計 */
+.stats-mini {
+  display:flex; gap:14px; align-items:center;
+}
+.stat-item {
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+}
+.stat-num {
+  font-family:'Noto Sans JP',sans-serif;
+  font-size:17px; font-weight:700; line-height:1; color:white;
+}
+.stat-lbl {
+  font-size:9px; font-weight:300; color:rgba(255,255,255,0.6); letter-spacing:0.08em;
+  font-family:'Noto Sans JP',sans-serif;
+}
+.stat-sep { width:1px; height:22px; background:rgba(255,255,255,0.2); }
+
+/* PROGRESS */
+.progress-bg {
+  height:3px; background:rgba(255,255,255,0.2); overflow:hidden;
+  margin:0 -18px;
+}
+.progress-bar {
+  height:100%;
+  background:rgba(255,255,255,0.8);
+  transition:width 0.5s ease;
+}
+
+/* フィルター行 */
+.header-filter-row {
+  display:flex; gap:10px; align-items:center;
+  padding:9px 0;
+  border-bottom:1px solid rgba(255,255,255,0.15);
+}
+.filter-label {
+  font-size:10px; font-weight:300; color:rgba(255,255,255,0.6);
+  letter-spacing:0.08em; white-space:nowrap;
+  font-family:'Noto Sans JP',sans-serif;
+}
+.filter-select {
+  flex:1; padding:5px 22px 5px 0;
+  border:none; border-bottom:1px solid rgba(255,255,255,0.3);
+  font-size:12px; font-weight:400; color:white;
+  font-family:'Noto Sans JP',sans-serif;
+  background:transparent; outline:none; cursor:pointer;
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='rgba(255,255,255,0.6)' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 4px center;
+  transition:border-color 0.2s;
+}
+.filter-select option { color:#1a1a1a; background:white; }
+.filter-select:focus { border-bottom-color:white; }
+.filter-divider { width:1px; height:18px; background:rgba(255,255,255,0.2); flex-shrink:0; }
+
+/* ビュー切替 */
+.view-tabs {
+  display:flex; gap:0;
+  border-bottom:1px solid rgba(255,255,255,0.15);
+}
+.view-tab {
+  flex:1; padding:9px 0;
+  border:none; background:none;
+  font-size:11px; font-weight:300; color:rgba(255,255,255,0.55);
+  cursor:pointer; font-family:'Noto Sans JP',sans-serif;
+  letter-spacing:0.06em;
+  border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  transition:all 0.2s;
+}
+.view-tab.active { color:white; border-bottom-color:white; font-weight:700; }
+
+/* JUMP NAV */
+.jump-nav {
+  display:flex; gap:14px;
+  overflow-x:auto; padding:8px 0 10px;
+  scrollbar-width:none;
+}
+.jump-nav::-webkit-scrollbar { display:none; }
+.jump-btn {
+  padding:0; border:none; background:none;
+  font-size:11px; font-weight:300; color:rgba(255,255,255,0.6);
+  cursor:pointer; white-space:nowrap; flex-shrink:0;
+  font-family:'Noto Sans JP',sans-serif;
+  letter-spacing:0.06em;
+  border-bottom:1px solid transparent;
+  transition:all 0.2s;
+}
+.jump-btn:hover, .jump-btn:active { color:white; border-bottom-color:rgba(255,255,255,0.6); }
+
+/* ========== CONTENT ========== */
+.content { padding:14px; max-width:480px; margin:0 auto; }
+
+/* PURPOSE SECTION */
+.purpose-section { margin-bottom:22px; }
+.purpose-title {
+  font-size:13px; font-weight:900;
+  padding:7px 12px; border-radius:10px;
+  margin-bottom:10px; display:inline-block;
+}
+.pt-dinner { background:rgba(232,131,58,0.12);  color:#b85e1a; }
+.pt-daily  { background:rgba(61,122,120,0.12);  color:#2a6260; }
+.pt-nana   { background:rgba(212,168,67,0.15);  color:#8a6400; }
+
+/* STORE SECTION */
+.store-section {
+  background:white; border-radius:14px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+  margin-bottom:10px; overflow:hidden;
+}
+.store-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 12px; border-left:4px solid;
+}
+.store-name-wrap { display:flex; align-items:center; gap:7px; }
+.store-name  { font-size:13px; font-weight:900; }
+.store-count { font-size:11px; color:#BBB; }
+.store-del-btn {
+  background:none; border:none; font-size:11px; color:#DDD;
+  cursor:pointer; padding:2px 6px; border-radius:5px;
+  transition:all 0.2s; font-family:'Noto Sans JP',sans-serif;
+}
+.store-del-btn:hover { background:#FFF5F0; color:var(--warm1); }
+
+/* ITEMS */
+.item-list { padding:0 12px 2px; }
+.item {
+  display:flex; align-items:center; gap:9px;
+  padding:8px 0; border-bottom:1px solid #F5F5F5;
+  animation:slideIn 0.2s ease;
+}
+.item:last-child { border-bottom:none; }
+@keyframes slideIn {
+  from { opacity:0; transform:translateX(-10px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+.item-check {
+  width:22px; height:22px; border-radius:50%;
+  border:2px solid #DDD; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; flex-shrink:0; transition:all 0.2s; background:white;
+}
+.item.done .item-check { background:var(--green); border-color:var(--green); color:white; }
+.item-name { flex:1; font-size:14px; font-weight:700; min-width:0; word-break:break-all; }
+.item.done .item-name { text-decoration:line-through; color:#CCC; font-weight:400; }
+.item-meta { font-size:10px; color:#CCC; white-space:nowrap; flex-shrink:0; }
+.item-del {
+  background:none; border:none; font-size:13px;
+  color:#DDD; cursor:pointer; padding:3px; transition:color 0.2s; flex-shrink:0;
+}
+.item-del:hover { color:var(--warm1); }
+
+/* badge in list view */
+.item-badge {
+  font-size:10px; font-weight:700; padding:2px 7px;
+  border-radius:99px; color:white; flex-shrink:0; white-space:nowrap;
+}
+.ib-dinner { background:var(--warm1); }
+.ib-daily  { background:var(--teal); }
+.ib-nana   { background:var(--warm2); }
+
+/* ADD INPUT */
+.add-row {
+  display:flex; gap:6px;
+  padding:8px 12px 10px; border-top:1px solid #F5F5F5; width:100%;
+}
+.add-input {
+  flex:1; min-width:0;
+  padding:7px 10px;
+  border:2px solid #EEE; border-radius:9px;
+  font-size:16px; font-family:'Noto Sans JP',sans-serif;
+  background:#FAFAFA; outline:none; transition:border-color 0.2s;
+}
+.add-input:focus { border-color:var(--teal); background:white; }
+.add-btn-small {
+  width:36px; height:36px; flex-shrink:0;
+  background:var(--teal);
+  color:white; border:none; border-radius:9px;
+  font-size:20px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:transform 0.15s;
+  box-shadow:0 3px 8px rgba(61,122,120,0.3);
+}
+.add-btn-small:hover  { transform:scale(1.08); }
+.add-btn-small:active { transform:scale(0.93); }
+
+.empty-store  { padding:10px 12px; font-size:12px; color:#CCC; text-align:center; }
+.empty-global { text-align:center; padding:48px 20px; color:#CCC; font-size:14px; }
+.empty-global .e-emoji { font-size:48px; margin-bottom:12px; }
+
+/* SECTION DIVIDER (買うもの一覧) */
+.list-divider {
+  font-size:11px; font-weight:700; letter-spacing:1px;
+  color:#BBB; padding:4px 2px 8px; text-transform:uppercase;
+}
+
+/* ADD STORE */
+.add-store-btn {
+  width:100%; padding:11px;
+  background:white; border:2px dashed #DDD; border-radius:12px;
+  font-size:12px; color:#AAA; cursor:pointer;
+  font-family:'Noto Sans JP',sans-serif;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  transition:all 0.2s; margin-top:2px;
+}
+.add-store-btn:hover { border-color:var(--teal); color:var(--teal); }
+.add-store-form {
+  display:none; background:white; border-radius:12px;
+  padding:12px; box-shadow:0 2px 12px rgba(0,0,0,0.08); margin-top:6px;
+}
+.add-store-form.open { display:block; }
+.add-store-form label { font-size:11px; color:#AAA; font-weight:700; display:block; margin-bottom:7px; }
+.add-store-row { display:flex; gap:6px; }
+.add-store-input {
+  flex:1; min-width:0; padding:8px 10px;
+  border:2px solid #EEE; border-radius:9px;
+  font-size:16px; font-family:'Noto Sans JP',sans-serif;
+  outline:none; transition:border-color 0.2s;
+}
+.add-store-input:focus { border-color:var(--teal); }
+.add-store-ok {
+  padding:8px 12px; background:var(--teal); color:white;
+  border:none; border-radius:9px; font-size:12px; font-weight:700;
+  cursor:pointer; font-family:'Noto Sans JP',sans-serif; flex-shrink:0;
+}
+.add-store-cancel {
+  padding:8px 8px; background:none; color:#AAA;
+  border:none; font-size:12px; cursor:pointer; flex-shrink:0;
+  font-family:'Noto Sans JP',sans-serif;
+}
+
+/* STORE COLORS — ティール×ウォーム */
+.sc0{border-color:var(--teal);}   .sn0{color:var(--teal);}
+.sc1{border-color:var(--warm1);}  .sn1{color:var(--warm1);}
+.sc2{border-color:var(--warm2);}  .sn2{color:var(--warm2);}
+.sc3{border-color:var(--teal-lt);}.sn3{color:var(--teal-lt);}
+.sc4{border-color:var(--warm3);}  .sn4{color:var(--warm3);}
+.sc5{border-color:#AAA;}          .sn5{color:#AAA;}
+```
+
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <!-- タイトル＋統計 -->
+  <div class="header-title-row">
+    <div class="header-title">お買い物リスト<span>shopping list</span></div>
+    <div class="stats-mini">
+      <div class="stat-item">
+        <div class="stat-num" id="statLeft">0</div>
+        <div class="stat-lbl">残り</div>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat-item">
+        <div class="stat-num" id="statDone">0</div>
+        <div class="stat-lbl">完了</div>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat-item">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-lbl">合計</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- プログレスバー（1px線） -->
+
+  <div class="progress-bg"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+
+  <!-- フィルター -->
+
+  <div class="header-filter-row">
+    <span class="filter-label">用途</span>
+    <select class="filter-select" id="selPurpose" onchange="onFilterChange()">
+      <option value="all">すべて</option>
+    </select>
+    <div class="filter-divider"></div>
+    <span class="filter-label">店</span>
+    <select class="filter-select" id="selStore" onchange="onFilterChange()">
+      <option value="all">すべて</option>
+    </select>
+  </div>
+
+  <!-- ビュー切替 -->
+
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab active" data-view="all"      onclick="switchView('all')">全体</button>
+    <button class="view-tab"        data-view="shoplist" onclick="switchView('shoplist')">買うもの一覧</button>
+  </div>
+
+  <!-- ジャンプナビ -->
+
+  <div class="jump-nav" id="jumpNav"></div>
+</div>
+
+<div class="content" id="mainContent"></div>
+
+<script>
+const PURPOSES = [
+  { id:'dinner', label:'🥕 食材',           cls:'pt-dinner', ibcls:'ib-dinner' },
+  { id:'daily',  label:'🧴 日用品・消耗品', cls:'pt-daily',  ibcls:'ib-daily'  },
+  { id:'nana',   label:'🍼 離乳食',         cls:'pt-nana',   ibcls:'ib-nana'   },
+];
+const STORE_EMOJIS = ['🛒','🏬','🏪','🛍️','🏷️','📦'];
+
+function load() {
+  return JSON.parse(localStorage.getItem('shopData_v6') || 'null') || {
+    stores: [{ id:'s1', name:'西友' }, { id:'s2', name:'アトレ' }],
+    items:  [],
+  };
+}
+function save(d) { localStorage.setItem('shopData_v6', JSON.stringify(d)); }
+
+let data = load();
+let currentView    = 'all';
+let filterPurpose  = 'all';
+let filterStore    = 'all';
+
+/* ========== SELECTS ========== */
+function rebuildSelects() {
+  const sp = document.getElementById('selPurpose');
+  const ss = document.getElementById('selStore');
+  const pv = sp.value; const sv = ss.value;
+
+  sp.innerHTML = '<option value="all">すべて</option>' +
+    PURPOSES.map(p=>`<option value="${p.id}">${p.label}</option>`).join('');
+  ss.innerHTML = '<option value="all">すべて</option>' +
+    data.stores.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+
+  sp.value = pv; ss.value = sv;
+  filterPurpose = sp.value;
+  filterStore   = ss.value;
+}
+
+function onFilterChange() {
+  filterPurpose = document.getElementById('selPurpose').value;
+  filterStore   = document.getElementById('selStore').value;
+  render();
+}
+
+/* ========== VIEW ========== */
+function switchView(v) {
+  currentView = v;
+  document.querySelectorAll('.view-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === v);
+  });
+  render();
+}
+
+/* ========== JUMP NAV ========== */
+function buildJumpNav() {
+  const nav = document.getElementById('jumpNav');
+  if (currentView !== 'all') { nav.innerHTML=''; return; }
+
+  // 表示中のセクションに応じてボタンを生成
+  let btns = '';
+  PURPOSES.forEach(p => {
+    if (filterPurpose !== 'all' && filterPurpose !== p.id) return;
+    btns += `<button class="jump-btn jb-${p.id}" onclick="jumpTo('sec-${p.id}')">${p.label}</button>`;
+  });
+  // 店ジャンプ（全体表示 & 店フィルターなし時）
+  if (filterStore === 'all') {
+    data.stores.forEach(s => {
+      if (filterPurpose === 'all') return; // 用途指定時のみ店ジャンプ出す
+      btns += `<button class="jump-btn jb-store" onclick="jumpTo('sec-store-${s.id}')">${esc(s.name)}</button>`;
+    });
+  }
+  nav.innerHTML = btns;
+}
+
+/* ========== STATS ========== */
+function renderStats() {
+  const total = data.items.length;
+  const done  = data.items.filter(i=>i.done).length;
+  const left  = total - done;
+  const pct   = total ? Math.round(done/total*100) : 0;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statLeft').textContent  = left;
+  document.getElementById('statDone').textContent  = done;
+  document.getElementById('progressBar').style.width = pct+'%';
+}
+
+/* ========== RENDER ========== */
+function render() {
+  rebuildSelects();
+  buildJumpNav();
+  renderStats();
+  if (currentView === 'shoplist') renderShopList();
+  else renderAllView();
+}
+
+/* --- 全体ビュー --- */
+function renderAllView() {
+  let html = '';
+  const showPurposes = PURPOSES.filter(p => filterPurpose==='all' || p.id===filterPurpose);
+  const showStores   = data.stores.filter(s => filterStore==='all' || s.id===filterStore);
+
+  showPurposes.forEach(p => {
+    html += `<div class="purpose-section" id="sec-${p.id}">
+      <div class="purpose-title ${p.cls}">${p.label}</div>`;
+
+    showStores.forEach((store) => {
+      const ci    = data.stores.indexOf(store) % 6;
+      const emoji = STORE_EMOJIS[data.stores.indexOf(store) % STORE_EMOJIS.length];
+      const sItems = data.items.filter(i=>i.purposeId===p.id && i.storeId===store.id);
+      const dnCnt  = sItems.filter(i=>i.done).length;
+
+      html += `<div class="store-section" id="sec-store-${store.id}">
+        <div class="store-header sc${ci}">
+          <div class="store-name-wrap">
+            <span class="store-name sn${ci}">${emoji} ${esc(store.name)}</span>
+            <span class="store-count" id="cnt-${p.id}-${store.id}">${dnCnt}/${sItems.length}</span>
+          </div>
+          <button class="store-del-btn" onclick="deleteStore('${store.id}')">✕</button>
+        </div>
+        <div class="item-list" id="list-${p.id}-${store.id}">`;
+
+      if (!sItems.length) {
+        html += `<div class="empty-store">商品を追加してください</div>`;
+      } else {
+        [...sItems.filter(i=>!i.done), ...sItems.filter(i=>i.done)].forEach(item => {
+          html += itemHTML(item, false);
+        });
+      }
+
+      html += `</div>
+        <div class="add-row">
+          <input class="add-input" id="inp-${p.id}-${store.id}"
+            placeholder="品名を入力…"
+            onkeydown="if(event.key==='Enter')addItem('${p.id}','${store.id}')">
+          <button class="add-btn-small" onclick="addItem('${p.id}','${store.id}')">＋</button>
+        </div>
+      </div>`;
+    });
+
+    if (filterStore === 'all') {
+      html += `
+        <button class="add-store-btn" onclick="toggleStoreForm('${p.id}')">＋ お店を追加</button>
+        <div class="add-store-form" id="storeForm-${p.id}">
+          <label>🏪 新しいお店の名前</label>
+          <div class="add-store-row">
+            <input class="add-store-input" id="storeInput-${p.id}" placeholder="例：ドラッグストア"
+              onkeydown="if(event.key==='Enter')confirmStore('${p.id}')">
+            <button class="add-store-ok" onclick="confirmStore('${p.id}')">追加</button>
+            <button class="add-store-cancel" onclick="toggleStoreForm('${p.id}')">✕</button>
+          </div>
+        </div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  if (!html) html = `<div class="empty-global"><div class="e-emoji">🔍</div>該当する商品がありません</div>`;
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+/* --- 買うもの一覧ビュー --- */
+function renderShopList() {
+  const allItems = data.items.filter(i => {
+    if (filterPurpose !== 'all' && i.purposeId !== filterPurpose) return false;
+    if (filterStore   !== 'all' && i.storeId   !== filterStore)   return false;
+    return true;
+  });
+
+  const undone = allItems.filter(i=>!i.done);
+  const done   = allItems.filter(i=>i.done);
+
+  if (!allItems.length) {
+    document.getElementById('mainContent').innerHTML =
+      `<div class="empty-global"><div class="e-emoji">🎉</div>買うものはありません！</div>`;
+    return;
+  }
+
+  let html = '';
+  if (undone.length) {
+    html += `<div class="list-divider">🛒 未購入 (${undone.length}件)</div>`;
+    html += `<div class="store-section"><div class="item-list">`;
+    groupByStore(undone).forEach(({ store, items }) => {
+      const em = STORE_EMOJIS[data.stores.indexOf(store) % STORE_EMOJIS.length];
+      html += `<div style="padding:6px 0 2px; font-size:11px; font-weight:900; color:var(--blue); border-bottom:1px solid #F0F0F0; margin-bottom:2px;">${em} ${esc(store.name)}</div>`;
+      items.forEach(item => { html += itemHTML(item, true); });
+    });
+    html += `</div></div>`;
+  }
+  if (done.length) {
+    html += `<div class="list-divider" style="margin-top:16px;">✓ 購入済み (${done.length}件)</div>`;
+    html += `<div class="store-section"><div class="item-list">`;
+    done.forEach(item => { html += itemHTML(item, true); });
+    html += `</div></div>`;
+  }
+
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function groupByStore(items) {
+  const map = new Map();
+  data.stores.forEach(s => map.set(s.id, { store:s, items:[] }));
+  items.forEach(item => { if (map.has(item.storeId)) map.get(item.storeId).items.push(item); });
+  return [...map.values()].filter(g=>g.items.length);
+}
+
+function itemHTML(item, showBadge) {
+  const p = PURPOSES.find(p=>p.id===item.purposeId);
+  return `<div class="item ${item.done?'done':''}" id="item-${item.id}">
+    <div class="item-check" onclick="toggleItem('${item.id}')">${item.done?'✓':''}</div>
+    <div class="item-name">${esc(item.name)}</div>
+    ${showBadge && p ? `<span class="item-badge ${p.ibcls}">${p.label.replace(/^../,'')}</span>` : ''}
+    ${item.done&&item.doneAt ? `<div class="item-meta">${item.doneAt}</div>` : ''}
+    <button class="item-del" onclick="deleteItem('${item.id}')">🗑</button>
+  </div>`;
+}
+
+/* ========== DOM PATCH — スクロールしない更新 ========== */
+
+// アイテム1件のDOMを直接書き換え（チェック時）
+function patchItem(item) {
+  const el = document.getElementById('item-'+item.id);
+  if (!el) { render(); return; }
+  el.className = 'item'+(item.done?' done':'');
+  el.querySelector('.item-check').textContent = item.done ? '✓' : '';
+  el.querySelector('.item-check').style.background = item.done ? 'var(--green)' : 'white';
+  el.querySelector('.item-check').style.borderColor = item.done ? 'var(--green)' : '#DDD';
+  el.querySelector('.item-check').style.color = item.done ? 'white' : '';
+  el.querySelector('.item-name').style.textDecoration = item.done ? 'line-through' : '';
+  el.querySelector('.item-name').style.color = item.done ? '#CCC' : '';
+  el.querySelector('.item-name').style.fontWeight = item.done ? '400' : '700';
+  // 日時表示を更新
+  let metaEl = el.querySelector('.item-meta');
+  if (item.done && item.doneAt) {
+    if (!metaEl) {
+      metaEl = document.createElement('div');
+      metaEl.className = 'item-meta';
+      el.querySelector('.item-del').before(metaEl);
+    }
+    metaEl.textContent = item.doneAt;
+  } else if (metaEl) {
+    metaEl.remove();
+  }
+  // カウンター更新
+  patchCounts(item.purposeId, item.storeId);
+  renderStats();
+
+  // 買うもの一覧ビューではチェック時に並び順が変わるので再描画
+  if (currentView === 'shoplist') {
+    const sy = window.scrollY;
+    renderShopList();
+    requestAnimationFrame(()=>window.scrollTo(0, sy));
+  }
+}
+
+// カウンター (x/y) だけ更新
+function patchCounts(purposeId, storeId) {
+  const el = document.getElementById('cnt-'+purposeId+'-'+storeId);
+  if (!el) return;
+  const sItems = data.items.filter(i=>i.purposeId===purposeId && i.storeId===storeId);
+  el.textContent = sItems.filter(i=>i.done).length+'/'+sItems.length;
+}
+
+// アイテム追加：該当リストにだけ要素を追加
+function patchAddItem(purposeId, storeId, item) {
+  const listEl = document.getElementById('list-'+purposeId+'-'+storeId);
+  if (!listEl) { render(); return; }
+  // 「商品を追加してください」を消す
+  const empty = listEl.querySelector('.empty-store');
+  if (empty) empty.remove();
+  // 未購入の末尾に追加（完了済みの前）
+  const doneItems = listEl.querySelectorAll('.item.done');
+  const div = document.createElement('div');
+  div.innerHTML = itemHTML(item, false);
+  const newEl = div.firstElementChild;
+  if (doneItems.length > 0) {
+    listEl.insertBefore(newEl, doneItems[0]);
+  } else {
+    listEl.appendChild(newEl);
+  }
+  patchCounts(purposeId, storeId);
+  renderStats();
+}
+
+// アイテム削除：該当要素だけ消す
+function patchDeleteItem(itemId, purposeId, storeId) {
+  const el = document.getElementById('item-'+itemId);
+  if (el) {
+    el.remove();
+    // リストが空になったら「追加してください」表示
+    const listEl = document.getElementById('list-'+purposeId+'-'+storeId);
+    if (listEl && !listEl.querySelector('.item')) {
+      listEl.innerHTML = `<div class="empty-store">商品を追加してください</div>`;
+    }
+  }
+  patchCounts(purposeId, storeId);
+  renderStats();
+  if (currentView === 'shoplist') {
+    const sy = window.scrollY;
+    renderShopList();
+    requestAnimationFrame(()=>window.scrollTo(0, sy));
+  }
+}
+
+/* ========== ACTIONS ========== */
+function jumpTo(secId) {
+  const el = document.getElementById(secId);
+  if (!el) return;
+  const headerH = document.querySelector('.header').offsetHeight;
+  window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - headerH - 8, behavior:'smooth' });
+}
+
+function addItem(purposeId, storeId) {
+  const key   = 'inp-'+purposeId+'-'+storeId;
+  const input = document.getElementById(key);
+  const name  = input ? input.value.trim() : '';
+  if (!name) { if(input) input.focus(); return; }
+  const item = { id:'i'+Date.now()+Math.random(), purposeId, storeId, name, done:false, doneAt:null };
+  data.items.push(item);
+  input.value = '';
+  save(data);
+  patchAddItem(purposeId, storeId, item);
+  input.focus();
+}
+
+function toggleItem(itemId) {
+  const item = data.items.find(i=>i.id===itemId);
+  if (!item) return;
+  item.done = !item.done;
+  item.doneAt = item.done
+    ? (()=>{ const n=new Date(); return `${n.getMonth()+1}/${n.getDate()} ${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}`; })()
+    : null;
+  save(data);
+  patchItem(item);
+}
+
+function deleteItem(itemId) {
+  const item = data.items.find(i=>i.id===itemId);
+  if (!item) return;
+  const { purposeId, storeId } = item;
+  data.items = data.items.filter(i=>i.id!==itemId);
+  save(data);
+  patchDeleteItem(itemId, purposeId, storeId);
+}
+
+function deleteStore(storeId) {
+  if (!confirm('このお店を削除しますか？\n（全用途のアイテムも削除されます）')) return;
+  data.stores = data.stores.filter(s=>s.id!==storeId);
+  data.items  = data.items.filter(i=>i.storeId!==storeId);
+  save(data); render();
+}
+
+function toggleStoreForm(purposeId) {
+  const form = document.getElementById('storeForm-'+purposeId);
+  if (!form) return;
+  form.classList.toggle('open');
+  if (form.classList.contains('open'))
+    setTimeout(()=>{ const el=document.getElementById('storeInput-'+purposeId); if(el) el.focus(); }, 80);
+}
+
+function confirmStore(purposeId) {
+  const input = document.getElementById('storeInput-'+purposeId);
+  const name  = input ? input.value.trim() : '';
+  if (!name) { if(input) input.focus(); return; }
+  if (!data.stores.find(s=>s.name===name))
+    data.stores.push({ id:'s'+Date.now(), name });
+  save(data); render();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+render();
+</script>
+
+</body>
+</html>
