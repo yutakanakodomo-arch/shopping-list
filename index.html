@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>お買い物リスト</title>
-　<link rel="apple-touch-icon" href="icon.png?v=2">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%233D7A78'/%3E%3Ctext x='90' y='82' font-family='sans-serif' font-size='36' font-weight='bold' fill='white' text-anchor='middle'%3E%E8%B2%B7%E3%81%84%E7%89%A9%3C/text%3E%3Ctext x='90' y='130' font-family='sans-serif' font-size='36' font-weight='bold' fill='white' text-anchor='middle'%3E%E3%83%AA%E3%82%B9%E3%83%88%3C/text%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -28,7 +28,7 @@
       padding-bottom:48px;
     }
 
-
+```
 /* ========== HEADER ========== */
 .header {
   background:#3D7A78;
@@ -205,6 +205,18 @@
   color:#DDD; cursor:pointer; padding:3px; transition:color 0.2s; flex-shrink:0;
 }
 .item-del:hover { color:var(--warm1); }
+.drag-handle {
+  color:#CCC; font-size:16px; cursor:grab; padding:3px 2px;
+  flex-shrink:0; touch-action:none; user-select:none; -webkit-user-select:none;
+}
+.drag-handle:active { cursor:grabbing; }
+.item.dragging {
+  opacity:0.3;
+}
+.item.drag-over {
+  border-top:3px solid var(--teal);
+  background:#EAF4F4;
+}
 
 /* badge in list view */
 .item-badge {
@@ -239,6 +251,21 @@
 }
 .add-btn-small:hover  { transform:scale(1.08); }
 .add-btn-small:active { transform:scale(0.93); }
+.mic-btn {
+  width:36px; height:36px; flex-shrink:0;
+  background:#F0F0F0; color:#888;
+  border:none; border-radius:9px; font-size:16px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s; user-select:none; -webkit-user-select:none;
+}
+.mic-btn.recording {
+  background:var(--warm1); color:white;
+  animation:mic-pulse 0.8s infinite;
+}
+@keyframes mic-pulse {
+  0%,100% { box-shadow:0 0 0 3px rgba(232,131,58,0.3); }
+  50%      { box-shadow:0 0 0 6px rgba(232,131,58,0.1); }
+}
 
 .empty-store  { padding:10px 12px; font-size:12px; color:#CCC; text-align:center; }
 .empty-global { text-align:center; padding:48px 20px; color:#CCC; font-size:14px; }
@@ -485,6 +512,11 @@ function renderAllView() {
           <input class="add-input" id="inp-${p.id}-${store.id}"
             placeholder="品名を入力…"
             onkeydown="if(event.key==='Enter')addItem('${p.id}','${store.id}')">
+          <button class="mic-btn" id="mic-${p.id}-${store.id}"
+            ontouchstart="startVoice(event,'${p.id}','${store.id}')"
+            ontouchend="stopVoice(event)"
+            onmousedown="startVoice(event,'${p.id}','${store.id}')"
+            onmouseup="stopVoice(event)">🎤</button>
           <button class="add-btn-small" onclick="addItem('${p.id}','${store.id}')">＋</button>
         </div>
       </div>`;
@@ -558,7 +590,7 @@ function groupByStore(items) {
 
 function itemHTML(item, showBadge) {
   const p = PURPOSES.find(p=>p.id===item.purposeId);
-  return `<div class="item ${item.done?'done':''}" id="item-${item.id}">
+  return `<div class="item ${item.done?'done':''}" id="item-${item.id}" data-id="${item.id}">
     <div class="item-check" onclick="toggleItem('${item.id}')">${item.done?'✓':''}</div>
     <div class="item-name">${esc(item.name)}</div>
     ${showBadge && p ? `<span class="item-badge ${p.ibcls}">${p.label.replace(/^../,'')}</span>` : ''}
@@ -717,6 +749,166 @@ function confirmStore(purposeId) {
   if (!data.stores.find(s=>s.name===name))
     data.stores.push({ id:'s'+Date.now(), name });
   save(data); render();
+}
+
+/* ========== ドラッグ並び替え ========== */
+let dragState = null;
+
+document.addEventListener('touchstart', dragStart, { passive: false });
+document.addEventListener('touchmove',  dragMove,  { passive: false });
+document.addEventListener('touchend',   dragEnd);
+document.addEventListener('touchcancel',dragEnd);
+
+function dragStart(e) {
+  const item = e.target.closest('.item');
+  if (!item || e.target.closest('.item-check') || e.target.closest('.item-del')) return;
+  const itemId = item.dataset.id;
+  if (!itemId) return;
+
+  const timer = setTimeout(() => {
+    if (navigator.vibrate) navigator.vibrate(40);
+    const rect = item.getBoundingClientRect();
+    const touch = e.touches[0];
+
+    // ゴースト生成
+    const ghost = item.cloneNode(true);
+    ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:9999;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,0.25);border-radius:10px;background:white;opacity:0.95;transform:scale(1.02);`;
+    document.body.appendChild(ghost);
+
+    item.style.opacity = '0.3';
+
+    dragState = {
+      itemId,
+      item,
+      ghost,
+      offsetY: touch.clientY - rect.top,
+      listEl: item.closest('.item-list'),
+      placeholder: null,
+    };
+
+    // プレースホルダー（挿入位置表示）
+    const ph = document.createElement('div');
+    ph.style.cssText = `height:3px;background:var(--teal);border-radius:2px;margin:2px 0;`;
+    dragState.placeholder = ph;
+
+  }, 180);
+
+  dragState = { timer };
+}
+
+function dragMove(e) {
+  if (!dragState) return;
+  if (dragState.timer && !dragState.ghost) {
+    // まだ長押し待ち中 → 指が動いたらキャンセル
+    clearTimeout(dragState.timer);
+    dragState = null;
+    return;
+  }
+  if (!dragState.ghost) return;
+  e.preventDefault();
+
+  const touch = e.touches[0];
+  const { ghost, offsetY, listEl, placeholder, item } = dragState;
+
+  // ゴーストを指に追従
+  ghost.style.top = (touch.clientY - offsetY) + 'px';
+
+  // 挿入位置を探す
+  const items = [...listEl.querySelectorAll('.item:not(.dragging-src)')];
+  let insertBeforeEl = null;
+
+  for (const el of items) {
+    if (el === item) continue;
+    const r = el.getBoundingClientRect();
+    if (touch.clientY < r.top + r.height / 2) {
+      insertBeforeEl = el;
+      break;
+    }
+  }
+
+  // プレースホルダーを移動
+  if (insertBeforeEl) {
+    listEl.insertBefore(placeholder, insertBeforeEl);
+  } else {
+    listEl.appendChild(placeholder);
+  }
+  dragState.insertBeforeEl = insertBeforeEl;
+}
+
+function dragEnd() {
+  if (!dragState) return;
+  if (dragState.timer) clearTimeout(dragState.timer);
+  if (!dragState.ghost) { dragState = null; return; }
+
+  const { item, ghost, listEl, placeholder, insertBeforeEl } = dragState;
+
+  // ゴーストとプレースホルダー削除
+  ghost.remove();
+  if (placeholder && placeholder.parentNode) placeholder.remove();
+  item.style.opacity = '';
+
+  // DOM上で並び替え
+  if (insertBeforeEl) {
+    listEl.insertBefore(item, insertBeforeEl);
+  } else {
+    listEl.appendChild(item);
+  }
+
+  // data.items を DOM順に合わせて更新
+  const newOrder = [...listEl.querySelectorAll('.item[data-id]')].map(el => el.dataset.id);
+  const srcItem = data.items.find(i => i.id === dragState.itemId);
+  if (srcItem) {
+    // 同じstore+purposeのアイテムだけ並び替え
+    const others = data.items.filter(i => !(i.storeId === srcItem.storeId && i.purposeId === srcItem.purposeId));
+    const group  = data.items.filter(i =>   i.storeId === srcItem.storeId && i.purposeId === srcItem.purposeId);
+    const sorted = newOrder.map(id => group.find(i => i.id === id)).filter(Boolean);
+    // groupに含まれないものはそのまま
+    const missing = group.filter(i => !sorted.find(s => s.id === i.id));
+    data.items = [...others, ...sorted, ...missing];
+    save(data);
+  }
+
+  dragState = null;
+}
+
+/* ========== 音声入力 ========== */
+let recognition = null;
+let micBtn = null;
+
+function startVoice(e, purposeId, storeId) {
+  e.preventDefault();
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { alert('このブラウザは音声入力に対応していません'); return; }
+
+  micBtn = document.getElementById('mic-'+purposeId+'-'+storeId);
+  const input = document.getElementById('inp-'+purposeId+'-'+storeId);
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'ja-JP';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    input.value = transcript;
+  };
+
+  recognition.onend = () => {
+    if (micBtn) micBtn.classList.remove('recording');
+  };
+
+  recognition.onerror = () => {
+    if (micBtn) micBtn.classList.remove('recording');
+  };
+
+  micBtn.classList.add('recording');
+  recognition.start();
+}
+
+function stopVoice(e) {
+  if (e) e.preventDefault();
+  if (recognition) { recognition.stop(); recognition = null; }
+  if (micBtn) { micBtn.classList.remove('recording'); micBtn = null; }
 }
 
 function esc(s) {
